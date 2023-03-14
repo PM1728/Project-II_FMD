@@ -21,6 +21,7 @@ if nose_cascade.empty():
 if mouth_cascade.empty():
   raise IOError('Unable to load the mouth cascade classifier xml file')
 
+
 def detect_and_predict_mask(frame, faceNet, maskNet):
 	
 	(h, w) = frame.shape[:2]
@@ -95,8 +96,9 @@ print("[INFO] starting video stream...")
 vs = VideoStream(src=0).start()
 time.sleep(2.0)
 
-
-
+Msk =8
+Mnt =8
+Nos =8
 
 # loop over the frames video stream
 while True:
@@ -115,7 +117,12 @@ while True:
 			(mask, withoutMask) = pred
 
 		
-			label = "Mask" if mask > withoutMask else "No Mask"
+			label = "Mask" if mask > withoutMask else "No Mask" 
+			if (label == 'Mask' ):
+				Msk = 1
+			else: Msk =0 
+			print('Mask =',Msk)
+
 			color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
 			
 		
@@ -127,23 +134,51 @@ while True:
 			cv2.rectangle(frame, (startX, startY), (endX, endY), color, 2)
 			
 			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-				
+   	
+		#nose
+	for (box2, detect_nose) in zip(locs, preds):
+		
+			(startX, startY, endX, endY) = box2
+			(no_nose_rects, nose_rects) = detect_nose
+   
+			(no_nose_rects, nose_rects) = detect_nose
+   
+			N = "Nose" if nose_rects > no_nose_rects else "No nose"	
+			if (N == 'Nose' ):
+				Nos = 1
+			else: Nos =0 
+			print("Nose =",Nos)
 			nose_rects = nose_cascade.detectMultiScale(gray, 1.3, 5)
 			for (x,y,w,h) in nose_rects:
 					cv2.rectangle(frame, (x,y), (x+w,y+h), (0,0,255), 3)
 					break
+		
+  		#mouth
+	for (box3, detect_mouth) in zip(locs, preds):
+		
+			(startX, startY, endX, endY) = box3
+			(no_mouth_rectes, mouth_rectes) = detect_mouth
+ 
+			M = "Mouth" if mouth_rectes > no_mouth_rectes else "No Mouth"
+			if (M == 'Mouth' ):
+				Mnt = 1
+			else: Mnt =0 
+			print("Mouth =",Mnt)
+			
 			mouth_rectes = mouth_cascade.detectMultiScale(gray, 1.1, 20)
 			for (x,y,w,h) in mouth_rectes:
 					cv2.rectangle(frame, (x,y), (x+w,y+h), (0,0,255), 3)
 					break
 		
+	 
    	# Save the image to a file
 	#file_name = "captured_image_" + str(int(time.time())) + ".jpg"
 	#file_path = "face mask recognition" + file_name
 	#cv2.imwrite(file_path, image)
 	#print("Detected and image saved")
-				
-				
+ 
+
+ 			
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
 	if key == 27:

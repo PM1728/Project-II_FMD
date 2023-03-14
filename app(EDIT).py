@@ -9,9 +9,54 @@ import imutils
 import time
 import cv2
 import os
-#connection DB
+import glob
+from datetime import datetime
+from datetime import date
+import face_recognition
 import mysql.connector
 
+FONT=cv2.FONT_HERSHEY_COMPLEX
+#number=[]
+#status=[]
+images=[]
+names=[]
+today = date.today()
+now = datetime.now()
+dtString = now.strftime("%H:%M:")
+path = "\images*.*"
+for file in glob.glob(path):
+    image = cv2.imread(file)
+    a=os.path.basename(file)
+    b=os.path.splitext(a)[0]
+    names.append(b)
+    images.append(image)
+def encoding1(images):
+    encode=[]
+
+    for img in images:
+        unk_encoding = face_recognition.face_encodings(img)[0]
+        encode.append(unk_encoding)
+    return encode    
+
+encodelist=encoding1(images)
+def mysqladddata(names):
+       mydb = mysql.connector.connect(
+       host= "127.0.0.1",
+       user="root",
+       password="",
+       database="data_db"
+
+)
+
+       a = mydb.cursor()
+       sql = ("INSERT IGNORE INTO users(Date,Time) VALUE(%s,%s)")
+       data=(today,dtString)
+
+       a.execute(sql,data)
+       
+
+       mydb.commit()
+       mydb.close()
 
 nose_cascade = cv2.CascadeClassifier('haarcascade_mcs_nose.xml')
 mouth_cascade = cv2.CascadeClassifier('haarcascade_mcs_mouth.xml')
@@ -107,7 +152,17 @@ while True:
 	image = vs.read()
 	frame = vs.read()
 	frame = imutils.resize(frame, width=600)
-
+	frame1=cv2.resize(frame,(0,0),None,0.25,0.25)
+	face_locations = face_recognition.face_locations(frame1)
+	curframe_encoding = face_recognition.face_encodings(frame1,face_locations)
+	for encodeface,faces in zip(curframe_encoding,face_locations):
+         results = face_recognition.compare_faces(encodelist, encodeface)
+         distance= face_recognition.face_distance(encodelist, encodeface)
+         mysqladddata(0)
+         
+        
+        
+         
 	(locs, preds) = detect_and_predict_mask(frame, faceNet, maskNet)
 
 
@@ -164,19 +219,25 @@ while True:
 				Mnt = 1
 			else: Mnt =0 
 			print("Mouth =",Mnt)
+	  
 			
 			mouth_rectes = mouth_cascade.detectMultiScale(gray, 1.1, 20)
 			for (x,y,w,h) in mouth_rectes:
 					cv2.rectangle(frame, (x,y), (x+w,y+h), (0,0,255), 3)
 					break
+				
+	# กดแล้ว up to database
+	# ข้อความบน program 3 กรณี มุมขวาบน
+
+   
+	
 		
-	 
-   	# Save the image to a file
-	#file_name = "captured_image_" + str(int(time.time())) + ".jpg"
+    # Save the image to a file
+	file_name = "captured_image_" + str(int(time.time())) + ".jpg"
 	#file_path = "face mask recognition" + file_name
 	#cv2.imwrite(file_path, image)
-	#print("Detected and image saved")
- 
+	print("Detected and image saved")
+
 
  			
 	cv2.imshow("Frame", frame)
@@ -187,3 +248,4 @@ while True:
 vs.release()
 cv2.destroyAllWindows()
 vs.stop()
+#Testing
