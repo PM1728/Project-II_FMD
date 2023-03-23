@@ -12,51 +12,20 @@ import os
 import glob
 from datetime import datetime
 from datetime import date
-import face_recognition
 import mysql.connector
+from smbus2 import SMBus
+from mlx90614 import MLX90614
+import RPi.GPIO as GPIO
+from time import sleep
+import notify2
+import subprocess
+import board
+import busio as io
+import adafruit_mlx90614
 
-FONT=cv2.FONT_HERSHEY_COMPLEX
-#number=[]
-#status=[]
-images=[]
-names=[]
-today = date.today()
-now = datetime.now()
-dtString = now.strftime("%H:%M:")
-path = "\images*.*"
-for file in glob.glob(path):
-    image = cv2.imread(file)
-    a=os.path.basename(file)
-    b=os.path.splitext(a)[0]
-    names.append(b)
-    images.append(image)
-def encoding1(images):
-    encode=[]
+i2c = io.I2C(board.SCL, board.SDA, frequency=100000)
+mlx = adafruit_mlx90614.MLX90614(i2c)
 
-    for img in images:
-        unk_encoding = face_recognition.face_encodings(img)[0]
-        encode.append(unk_encoding)
-    return encode    
-
-encodelist=encoding1(images)
-def mysqladddata(names):
-       mydb = mysql.connector.connect(
-       host= "127.0.0.1",
-       user="root",
-       password="",
-       database="data_db"
-
-)
-
-       a = mydb.cursor()
-       sql = ("INSERT IGNORE INTO users(Date,Time) VALUE(%s,%s)")
-       data=(today,dtString)
-
-       a.execute(sql,data)
-       
-
-       mydb.commit()
-       mydb.close()
 
 nose_cascade = cv2.CascadeClassifier('haarcascade_mcs_nose.xml')
 mouth_cascade = cv2.CascadeClassifier('haarcascade_mcs_mouth.xml')
@@ -112,6 +81,25 @@ def detect_and_predict_mask(frame, faceNet, maskNet):
 
 
 	return (locs, preds)
+	
+#def openGate():
+    #pwm.ChangeDutyCycle(2.0)
+    #pigpio.set_PWM_dutycycle(2.0)
+    #sleep(0.5)
+    
+    
+#def closeGate():
+    #pwm.ChangeDutyCycle(12.0)
+    #pigpio.set_PWM_dutycycle(12.0)
+    #sleep(0.1)
+
+
+#def closeEverything():
+		#GPIO.output(redLed, GPIO.LOW)
+		#GPIO.output(greenLed, GPIO.LOW)
+		#GPIO.output(buzz, GPIO.LOW)
+		#closeGate()
+        
 
 
 ap = argparse.ArgumentParser()
@@ -145,6 +133,8 @@ Msk =8
 Mnt =8
 Nos =8
 
+
+
 # loop over the frames video stream
 while True:
 	
@@ -152,18 +142,11 @@ while True:
 	image = vs.read()
 	frame = vs.read()
 	frame = imutils.resize(frame, width=600)
-	frame1=cv2.resize(frame,(0,0),None,0.25,0.25)
-	face_locations = face_recognition.face_locations(frame1)
-	curframe_encoding = face_recognition.face_encodings(frame1,face_locations)
-	for encodeface,faces in zip(curframe_encoding,face_locations):
-         results = face_recognition.compare_faces(encodelist, encodeface)
-         distance= face_recognition.face_distance(encodelist, encodeface)
-         mysqladddata(0)
-         
-        
+	
         
          
 	(locs, preds) = detect_and_predict_mask(frame, faceNet, maskNet)
+	
 
 
 	for (box, pred) in zip(locs, preds):
@@ -182,6 +165,11 @@ while True:
 			
 		
 			label = "{}: {:.2f}%".format(label, max(mask, withoutMask) * 100)
+			targetTemp = "{:.2f}".format(mlx.object_temperature)
+
+			sleep(1)
+			print("Target Temperature:", targetTemp,"°C")
+			
 
 		
 			cv2.putText(frame, label, (startX, startY - 10),
@@ -189,6 +177,14 @@ while True:
 			cv2.rectangle(frame, (startX, startY), (endX, endY), color, 2)
 			
 			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+   
+			#dist = GPIO.input(ir)
+
+			#if dist == 0:
+				#applyLogic(label)
+			#else:
+				#closeEverything()
+        
    	
 		#nose
 	for (box2, detect_nose) in zip(locs, preds):
@@ -206,7 +202,7 @@ while True:
 			nose_rects = nose_cascade.detectMultiScale(gray, 1.3, 5)
 			for (x,y,w,h) in nose_rects:
 					cv2.rectangle(frame, (x,y), (x+w,y+h), (0,0,255), 3)
-					break
+					
 		
   		#mouth
 	for (box3, detect_mouth) in zip(locs, preds):
@@ -224,28 +220,31 @@ while True:
 			mouth_rectes = mouth_cascade.detectMultiScale(gray, 1.1, 20)
 			for (x,y,w,h) in mouth_rectes:
 					cv2.rectangle(frame, (x,y), (x+w,y+h), (0,0,255), 3)
-					break
+					
 				
 	# กดแล้ว up to database
 	# ข้อความบน program 3 กรณี มุมขวาบน
 
    
-	
-		
-    # Save the image to a file
-	file_name = "captured_image_" + str(int(time.time())) + ".jpg"
-	#file_path = "face mask recognition" + file_name
-	#cv2.imwrite(file_path, image)
+	keyCap = cv2.waitKey(1) & 0xFF
+	if keyCap == ord("c"):		
+	# Save the image to a file
+		file_name = "captured_image_" + str(int(time.time())) + ".jpg"
+		file_path = "face mask detection" + file_name
+		cv2.imwrite(file_path, image)
 	print("Detected and image saved")
+ 
 
 
  			
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
-	if key == 27:
-		break	
+	if key == ord("q"):
+            break
 
 vs.release()
 cv2.destroyAllWindows()
+#pwm.stop()
+GPIO.cleanup()
 vs.stop()
 #Testing
